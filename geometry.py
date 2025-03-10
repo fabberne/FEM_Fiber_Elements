@@ -413,6 +413,95 @@ class Polygon:
 
         return elements, node_coords
 
+class L_Beam:
+
+    def __init__(self, width, height, thickness, r_corner, r_edge, rotation_angle = 0):
+
+        self.h      = height
+        self.w      = width
+        self.r_1    = r_corner
+        self.r_2    = r_edge
+        self.t      = thickness
+        self.cos    = np.cos(np.radians(rotation_angle))
+        self.sin    = np.sin(np.radians(rotation_angle))
+
+        self.points = [(0                , 0                ),
+                       (self.w           , 0                ),
+                       (self.w           , self.t - self.r_2),
+                       (self.w - self.r_2, self.t - self.r_2),
+                       (self.w - self.r_2, self.t           ),
+                       (self.t + self.r_1, self.t           ),
+                       (self.t + self.r_1, self.t + self.r_1),
+                       (self.t           , self.t + self.r_1),
+                       (self.t           , self.h - self.r_2),
+                       (self.t - self.r_2, self.h - self.r_2),
+                       (self.t - self.r_2, self.h           ),
+                       (0                , self.h           )]
+
+        for i, (x, y) in enumerate(self.points):
+            self.points[i] = (x * self.cos - y * self.sin,
+                              x * self.sin + y * self.cos)
+
+    def generate_mesh(self, type = "triangle", size = 0.1):
+        gmsh.initialize()
+        gmsh.model.add("Polygon")
+
+        # Define Points
+        for i, (x, y) in enumerate(self.points):
+            gmsh.model.geo.addPoint(x, y, 0, size, i + 1)
+
+        gmsh.model.geo.synchronize()
+
+        # Define Lines
+        gmsh.model.geo.addLine(1, 2)
+        gmsh.model.geo.addLine(2, 3)
+
+        gmsh.model.geo.addCircleArc(3, 4, 5)
+
+        gmsh.model.geo.addLine(5, 6)
+
+        gmsh.model.geo.addCircleArc(6, 7, 8)
+
+        gmsh.model.geo.addLine(8, 9)
+
+        gmsh.model.geo.addCircleArc(9, 10, 11)
+
+        gmsh.model.geo.addLine(11, 12)
+        gmsh.model.geo.addLine(12, 1)
+
+        # Define Curve Loop
+        gmsh.model.geo.addCurveLoop(list(range(1, 10)))
+        
+        # Define Plane Surfaces
+        gmsh.model.geo.addPlaneSurface([1])
+
+        gmsh.model.geo.synchronize()
+
+        if type == "quadrilateral":
+            # Ensure quadrilateral elements
+            gmsh.model.mesh.setRecombine(2, 1)
+
+        # Generate and optimize mesh
+        gmsh.model.mesh.generate(2)
+
+        node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+        node_coords = np.array(node_coords).reshape(-1, 3)[:, :2]
+
+        elem_types, elem_tags, elem_nodes = gmsh.model.mesh.getElements()
+
+        elements = []
+        for i, e_type in enumerate(elem_types):
+            if e_type == 2:
+                elements = np.array(elem_nodes[i]).reshape(-1, 3) - 1
+            if e_type == 3:
+                elements = np.array(elem_nodes[i]).reshape(-1, 4) - 1
+
+        gmsh.finalize()
+
+        elements = [element.Element_2D(elem, node_coords[elem]) for elem in elements]
+
+        return elements, node_coords
+
 class ReinforcedConcreteColumn:
     def __init__(self, width, height, concrete_cover, rebar_diameter, rebar_spacing):
         self.width  = width

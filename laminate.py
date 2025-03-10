@@ -13,8 +13,8 @@ class Laminate:
             - 'thickness': thickness of the ply
         """
         self.layers = layers
-        self.n = len(layers)
-        self.h = np.cumsum([0] + [l['thickness'] for l in layers]) - sum(l['thickness'] for l in layers) / 2
+        self.n      = len(layers)
+        self.h      = np.cumsum([0] + [l['thickness'] for l in layers]) - sum(l['thickness'] for l in layers) / 2
         self.A, self.B, self.D = self.compute_ABD_matrix()
         self.Ex, self.Ey, self.Gxy, self.vxy = self.compute_equivalent_properties()
     
@@ -25,17 +25,17 @@ class Laminate:
         Q22 = E2 / (1 - v12 * v21)
         Q12 = v12 * E2 / (1 - v12 * v21)
         Q66 = G12
-        return np.array([[Q11, Q12, 0],
-                         [Q12, Q22, 0],
-                         [0,   0,  Q66]])
+        return np.array([[Q11, Q12,    0],
+                         [Q12, Q22,    0],
+                         [  0,   0,  Q66]])
     
     def transform_Q(self, Q, theta):
         """Transforms the stiffness matrix Q to the laminate coordinate system"""
         theta = np.radians(theta)
         c, s = np.cos(theta), np.sin(theta)
-        T = np.array([[c**2, s**2, 2*c*s],
-                      [s**2, c**2, -2*c*s],
-                      [-c*s, c*s, c**2 - s**2]])
+        T = np.array([[ c**2, s**2,       2*c*s],
+                      [ s**2, c**2,      -2*c*s],
+                      [-c*s ,  c*s, c**2 - s**2]])
         return T @ Q @ np.linalg.inv(T)
     
     def compute_ABD_matrix(self):
@@ -58,8 +58,8 @@ class Laminate:
     def compute_equivalent_properties(self):
         """Computes the equivalent material properties of the laminate."""
         h_total = self.h[-1] - self.h[0]
-        Ex = self.A[0, 0] / h_total
-        Ey = self.A[1, 1] / h_total
+        Ex  = self.A[0, 0] / h_total
+        Ey  = self.A[1, 1] / h_total
         Gxy = self.A[2, 2] / h_total
         vxy = self.A[0, 1] / self.A[1, 1]
         return Ex, Ey, Gxy, vxy
@@ -79,8 +79,8 @@ class Laminate:
         print(tabulate(data, headers=headers, tablefmt="fancy_grid"))
 
         properties = [
-            ["Ex", f"{self.Ex:.2e}"],
-            ["Ey", f"{self.Ey:.2e}"],
+            ["Ex" , f"{self.Ex:.2e}"],
+            ["Ey" , f"{self.Ey:.2e}"],
             ["Gxy", f"{self.Gxy:.2e}"],
             ["vxy", f"{self.vxy:.2e}"]
         ]
@@ -89,19 +89,9 @@ class Laminate:
 
 class LaminateLoadAnalysis:
     def __init__(self, laminate):
-        """
-        Initialisiert die Belastungsanalyse für ein gegebenes Laminat.
-        :param laminate: Ein Objekt der Klasse Laminate
-        """
         self.laminate = laminate
     
     def apply_load(self, Nx, Ny, Nxy, Mx=0, My=0, Mxy=0):
-        """
-        Berechnet die Dehnungen und Krümmungen der Laminatmittelebene unter gegebener Belastung.
-        :param Nx, Ny, Nxy: Normal- und Schubkräfte pro Längeneinheit
-        :param Mx, My, Mxy: Biegemomente pro Längeneinheit (optional)
-        :return: Mitteldehnungen (ex, ey, gxy) und Krümmungen (kx, ky, kxy)
-        """
         N = np.array([Nx, Ny, Nxy])
         M = np.array([Mx, My, Mxy])
         
@@ -116,12 +106,6 @@ class LaminateLoadAnalysis:
         return midplane_strains, midplane_curvatures
 
     def compute_ply_stresses_strains(self, midplane_strains, midplane_curvatures):
-        """
-        Berechnet die Spannungen und Dehnungen in jeder Laminatschicht.
-        :param midplane_strains: Dehnungen der Mittelfläche
-        :param midplane_curvatures: Krümmungen der Mittelfläche
-        :return: Spannungen und Dehnungen pro Schicht
-        """
         ply_stresses = []
         ply_strains = []
         
@@ -140,7 +124,6 @@ class LaminateLoadAnalysis:
         return np.array(ply_strains), np.array(ply_stresses)
 
     def print_ply_results(self, ply_strains, ply_stresses):
-        """Prints the ply strains and stresses in tabular format."""
         strain_table = [[i + 1] + list(map(lambda x: f"{x:.2e}", ply_strains[i])) for i in range(len(ply_strains))]
         stress_table = [[i + 1] + list(map(lambda x: f"{x:.2e}", ply_stresses[i])) for i in range(len(ply_stresses))]
         
