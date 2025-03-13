@@ -67,7 +67,7 @@ class Rectangle:
 
         gmsh.finalize()
         
-        elements = [element.Element_2D(elem, node_coords[elem]) for elem in elements]
+        elements = [element.Element_2D(elem, node_coords[elem], mat="concrete") for elem in elements]
 
         return elements, node_coords
     

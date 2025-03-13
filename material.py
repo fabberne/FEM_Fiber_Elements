@@ -18,11 +18,22 @@ class Concrete_C30_37(Material):
         gamma   = 25 * 10**(-6)  # N/mm3
         E       = 32000          # N/mm2
         f_druck = 20             # N/mm2
-        f_zug   = 0.27           # N/mm2
+        f_zug   = 1.28           # N/mm2
 
         super().__init__(gamma, E, f_druck, f_zug)
 
         self.color = (0, 0, 0, 0.5)
+    
+    def get_stress(self, strain):
+
+        stress = self.E * strain
+
+        if stress > self.f_druck:
+            stress = self.f_druck
+        elif stress < -self.f_zug:
+            stress = 0
+
+        return stress
 
 
 class Steel_S235(Material):
@@ -40,7 +51,7 @@ class Steel_S235(Material):
 
     def get_stress(self, strain):
 
-        stress = np.sign(self.E * strain) * min(235, abs(self.E * strain))
+        stress = np.sign(self.E * strain) * min(self.f_druck, abs(self.E * strain))
 
         return stress
 
@@ -58,6 +69,12 @@ class Steel_S355(Material):
         super().__init__(gamma, E, f_druck, f_zug)
 
         self.color = (0, 0, 1, 0.5)
+    
+    def get_stress(self, strain):
+
+        stress = np.sign(self.E * strain) * min(self.f_druck, abs(self.E * strain))
+
+        return stress
 
 
 class Rebar_B500B(Material):
