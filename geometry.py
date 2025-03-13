@@ -498,7 +498,7 @@ class L_Beam:
 
         gmsh.finalize()
 
-        elements = [element.Element_2D(elem, node_coords[elem]) for elem in elements]
+        elements = [element.Element_2D(elem, node_coords[elem], mat="steel") for elem in elements]
 
         return elements, node_coords
 

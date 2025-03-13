@@ -1,3 +1,5 @@
+import numpy as np
+
 class Material:
 
     def __init__(self, gamma, E, f_druck, f_zug):
@@ -35,6 +37,13 @@ class Steel_S235(Material):
         super().__init__(gamma, E, f_druck, f_zug)
 
         self.color = (0, 0, 1, 0.5)
+
+    def get_stress(self, strain):
+
+        stress = np.sign(self.E * strain) * min(235, abs(self.E * strain))
+
+        return stress
+
 
 
 class Steel_S355(Material):
