@@ -34,7 +34,7 @@ class stress_strain_analysis:
 
         for elem in self.mesh.elements:
             eps_normal = self.eps_x
-            eps_cruv   = (elem.centroid()[1] - self.mesh.get_centroid()[1]) * self.xsi
+            eps_cruv   = (elem.Cy - self.mesh.Cy) * self.xsi
 
             self.strains = np.append(self.strains, eps_normal + eps_cruv)
 
@@ -61,13 +61,26 @@ class stress_strain_analysis:
         My = 0
 
         for i, elem in enumerate(self.mesh.elements):
-            N  += elem.area() * self.stresses[i]
-            My += elem.area() * self.stresses[i] * (elem.centroid()[1] - self.mesh.get_centroid()[1])
+            N  += elem.A * self.stresses[i]
+            My += elem.A * self.stresses[i] * (elem.Cy - self.mesh.Cy)
 
         N  = N  / 1000         # kN
         My = My / 1000 / 1000 # kNm
         
         return N, My
+    
+    def find_strain_and_curvature(self, V):
+
+        self.set_strain_and_curvature(V[0], V[1])
+        self.calculate_strains()
+        self.calculate_stresses()
+
+        Nx, My = self.get_section_forces()
+
+        Residual = (Nx - self.Nx)**2 + (My - self.My)**2
+
+        return Residual
+
 
     def plot_strains(self):
         if len(self.strains) == 0:
