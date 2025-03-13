@@ -90,6 +90,19 @@ class Rebar_B500B(Material):
 
         self.color = (0, 0.2, 1, 0.5)
 
+        self.f_k  = 1.08 * f_druck
+        self.e_s  = self.f_druck / self.E
+        self.E_h  = (self.f_k - self.f_druck) / (0.05 - self.e_s)
+    
+    def get_stress(self, strain):
+
+        if abs(strain) <= self.e_s:
+            stress = strain * self.E
+        else:
+            stress = np.sign(strain) *  (self.f_druck + self.E_h * (abs(strain) - self.e_s))
+
+        return stress
+
 class Unknown(Material):
 
     def __init__(self):
