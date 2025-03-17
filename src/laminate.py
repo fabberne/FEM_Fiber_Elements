@@ -1,5 +1,10 @@
 import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
 from tabulate import tabulate
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.patches import Rectangle
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 class Laminate:
     def __init__(self, layers):
@@ -85,6 +90,112 @@ class Laminate:
             ["vxy", f"{self.vxy:.2e}"]
         ]
         print(tabulate(properties, headers=["Property", "Value"], tablefmt="fancy_grid"))
+
+
+    def plot(self):
+        fig = plt.figure(figsize=(12, 7))
+        ax = fig.add_subplot(111, projection='3d', computed_zorder=False)
+        colors = ["C0", "C1", "C2", "C3", "C4", "C5", "C6"]
+        names  = []
+
+        total_height = sum(l['thickness'] for l in self.layers)
+        current_z = 0
+        width = total_height * 5  # Base dimensions for the plot
+        lengths = [width + (len(self.layers) - i - 1) * 2 * total_height for i in range(len(self.layers))]
+
+
+        for i, layer in enumerate(self.layers):
+            if layer["name"] in names:
+                name  = layer["name"]
+                color = colors[names.index(name)]
+            else:
+                names.append(layer["name"])
+                name  = layer["name"]
+                color = colors[len(names) - 1]
+
+            # Define vertices of the ply
+            vertices = [
+                [         0,     0, current_z],
+                [lengths[i],     0, current_z],
+                [lengths[i], width, current_z],
+                [         0, width, current_z],
+                [         0,     0, current_z + layer['thickness']],
+                [lengths[i],     0, current_z + layer['thickness']],
+                [lengths[i], width, current_z + layer['thickness']],
+                [         0, width, current_z + layer['thickness']]
+            ]
+            
+            faces = [
+                [vertices[0], vertices[1], vertices[2], vertices[3]],  # Bottom face
+                [vertices[4], vertices[5], vertices[6], vertices[7]],  # Top face
+                [vertices[0], vertices[1], vertices[5], vertices[4]],  # Side 1
+                [vertices[1], vertices[2], vertices[6], vertices[5]],  # Side 2
+                [vertices[2], vertices[3], vertices[7], vertices[6]],  # Side 3
+                [vertices[3], vertices[0], vertices[4], vertices[7]]   # Side 4
+            ]
+
+            ax.add_collection3d(Poly3DCollection(faces, color=color, edgecolor='black', zorder=i))
+
+            # Fiber orientation lines
+            num_lines = width / total_height * 2
+            for j in range(int(2*num_lines)):
+                alpha = np.radians(layer['theta'])
+
+                if alpha != np.pi / 2:
+                    spacing = width / num_lines / np.cos(alpha)
+                    x_start = 0
+                    y_start = spacing * j if alpha >= 0 else width - spacing * j
+
+                    x_end = lengths[i]
+                    y_end = y_start + lengths[i] * np.tan(alpha)
+                    if y_end > width and alpha != 0:
+                        y_end = width
+                        x_end = (width - y_start) / np.tan(alpha)
+                    if y_end < 0 and alpha != 0:
+                        y_end = 0
+                        x_end = - (y_start) / np.tan(alpha)
+
+                    if y_start <= width and y_start >= 0:
+                        ax.plot([x_start, x_end],
+                                [y_start, y_end],
+                                [current_z + layer['thickness']], 
+                                color='k', lw=1, zorder=i)
+                
+                if alpha != 0:
+                    spacing = abs(width / num_lines / np.sin(alpha))
+                    x_start = spacing * (j + 1)
+                    y_start = 0 if alpha > 0 else width
+
+                    x_end = x_start + abs(width / np.tan(alpha))
+                    y_end = width if alpha > 0 else 0
+
+                    if x_end > lengths[i]:
+                        y_end = y_start + (lengths[i] - x_start) * np.tan(alpha)
+                        x_end = lengths[i]
+
+                    if x_start < lengths[i]:
+                        ax.plot([x_start, x_end],
+                                [y_start, y_end],
+                                [current_z + layer['thickness']], 
+                                color='k', lw=1, zorder=i)
+                
+            # Move to next layer
+            current_z += layer['thickness']
+
+        for i in enumerate(names):
+            legend_elements = [Patch(facecolor=colors[i], edgecolor='k', label=names[i]) for i, name in enumerate(names)]
+
+        # Formatting the 3D plot
+        ax.set_xlim([0, lengths[0] + total_height])
+        ax.set_ylim([-total_height, width + total_height])
+        ax.set_zlim([-total_height, current_z + total_height])
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
+        ax.set_zticklabels([])
+        ax.set_aspect('equal', "box")
+        ax.legend(handles=legend_elements)
+        plt.show()
+
 
 
 class LaminateLoadAnalysis:
