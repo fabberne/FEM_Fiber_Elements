@@ -19,7 +19,9 @@ class Laminate:
         """
         self.layers = layers
         self.n      = len(layers)
-        self.h      = np.cumsum([0] + [l['thickness'] for l in layers]) - sum(l['thickness'] for l in layers) / 2
+        self.h      = [-sum(l['thickness'] for l in layers) / 2]
+        for i, layer in enumerate(self.layers):
+            self.h.append(self.h[-1] + layer['thickness'])
         self.A, self.B, self.D = self.compute_ABD_matrix()
         self.Ex, self.Ey, self.Gxy, self.vxy = self.compute_equivalent_properties()
     
@@ -202,6 +204,7 @@ class LaminateLoadAnalysis:
     def __init__(self, laminate):
         self.laminate = laminate
     
+
     def apply_load(self, Nx, Ny, Nxy, Mx=0, My=0, Mxy=0):
         N = np.array([Nx, Ny, Nxy])
         M = np.array([Mx, My, Mxy])
@@ -213,8 +216,12 @@ class LaminateLoadAnalysis:
         midplane_strains_curvatures = np.linalg.solve(ABD, loads)
         midplane_strains = midplane_strains_curvatures[:3]
         midplane_curvatures = midplane_strains_curvatures[3:]
+
+        self.midplane_strains = midplane_strains
+        self.midplane_curvatures = midplane_curvatures
         
         return midplane_strains, midplane_curvatures
+
 
     def compute_ply_stresses_strains(self, midplane_strains, midplane_curvatures):
         ply_stresses = []
@@ -224,8 +231,9 @@ class LaminateLoadAnalysis:
             Q = self.laminate.Q_matrix(layer['E1'], layer['E2'], layer['G12'], layer['v12'])
             Q_bar = self.laminate.transform_Q(Q, layer['theta'])
             
-            z = self.laminate.h[i]  # Abstand zur Mittelfläche
+            z = self.laminate.h[i] + layer["thickness"] / 2   # Abstand zur Mittelfläche
             
+
             strain = midplane_strains + z * midplane_curvatures
             stress = Q_bar @ strain
             
@@ -233,6 +241,31 @@ class LaminateLoadAnalysis:
             ply_stresses.append(stress)
         
         return np.array(ply_strains), np.array(ply_stresses)
+
+    def compute_stress_strains_for_plot(self, midplane_strains, midplane_curvatures):
+        ply_stresses = []
+        ply_strains = []
+        
+        for i, layer in enumerate(self.laminate.layers):
+            Q = self.laminate.Q_matrix(layer['E1'], layer['E2'], layer['G12'], layer['v12'])
+            Q_bar = self.laminate.transform_Q(Q, layer['theta'])
+            
+            z_1 = self.laminate.h[i]   # Abstand zur Mittelfläche
+            z_2 = self.laminate.h[i] + layer["thickness"]   # Abstand zur Mittelfläche
+            
+
+            strain_1 = midplane_strains + z_1 * midplane_curvatures
+            stress_1 = Q_bar @ strain_1
+            strain_2 = midplane_strains + z_2 * midplane_curvatures
+            stress_2 = Q_bar @ strain_2
+            
+            ply_strains.append(strain_1)
+            ply_strains.append(strain_2)
+            ply_stresses.append(stress_1)
+            ply_stresses.append(stress_2)
+        
+        return np.array(ply_strains), np.array(ply_stresses)
+
 
     def print_ply_results(self, ply_strains, ply_stresses):
         strain_table = [[i + 1] + list(map(lambda x: f"{x:.2e}", ply_strains[i])) for i in range(len(ply_strains))]
@@ -243,3 +276,69 @@ class LaminateLoadAnalysis:
         
         print("\nSpannungen pro Schicht:")
         print(tabulate(stress_table, headers=["Schicht", "Sxx", "Syy", "Txy"], tablefmt="fancy_grid"))
+
+
+    def plot_stress_strain_variation(self):
+        fig, ax = plt.subplots(1, 3, gridspec_kw={'width_ratios': [1, 2, 2]}, figsize=(7, 4), sharey=True)
+
+        colors = ["C0", "C1", "C2", "C3", "C4", "C5", "C6"]
+        names  = []
+
+        total_thickness = sum(layer['thickness'] for layer in self.laminate.layers)
+    
+        z_positions = []
+        for i, l in enumerate(self.laminate.layers):
+            z_positions.append(self.laminate.h[i])
+            z_positions.append(self.laminate.h[i] + l["thickness"])
+
+        # Laminate plot
+        current_height = -total_thickness/2
+        for i, layer in enumerate(self.laminate.layers):
+            if layer["name"] in names:
+                name  = layer["name"]
+                color = colors[names.index(name)]
+            else:
+                names.append(layer["name"])
+                name  = layer["name"]
+                color = colors[len(names) - 1]
+
+            ax[0].add_patch(plt.Rectangle((0, current_height), 1, layer['thickness'],
+                                          facecolor=color, edgecolor='black'))
+            current_height += layer['thickness']
+
+        ax[0].set_xticks([])
+        ax[0].set_yticks([])
+        ax[0].set_ylim(-total_thickness/2, total_thickness/2)
+
+        for i in enumerate(names):
+            legend_elements = [Patch(facecolor=colors[i], edgecolor='k', label=names[i]) for i, name in enumerate(names)]
+        ax[0].legend(handles=legend_elements)
+
+
+        strains, stresses = self.compute_stress_strains_for_plot(self.midplane_strains, self.midplane_curvatures)
+        # Strain variation plot
+        strain_x = np.array([strain[0] for strain in strains])
+        ax[1].plot(strain_x, z_positions, color='C0', label="epsilon_xx")
+        strain_y = np.array([strain[1] for strain in strains])
+        ax[1].plot(strain_y, z_positions, color='C1', label="epsilon_yy")
+        ax[1].set_title("Strain Variation")
+        ax[1].legend()
+        ax[1].invert_yaxis()
+
+        # Stress variation plot
+        stress_x = np.array([stress[0] for stress in stresses])
+        ax[2].plot(stress_x, z_positions, color='C0', label="sigma_xx")
+        stress_y = np.array([stress[1] for stress in stresses])
+        ax[2].plot(stress_y, z_positions, color='C1', label="sigma_yy")
+        ax[2].set_title("Stress Variation")
+        ax[2].legend()
+        ax[2].invert_yaxis()
+
+        for a in ax:
+            a.axhline(0, color='black', linestyle='--')
+            a.axvline(0, color='black', linestyle='-')
+            for i, h in enumerate(self.laminate.h):
+                a.axhline(h,color='k', linestyle='-', lw=0.5, alpha=0.5)
+
+        plt.tight_layout()
+        plt.show()
