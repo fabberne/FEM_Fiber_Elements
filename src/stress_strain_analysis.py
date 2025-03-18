@@ -11,62 +11,63 @@ import geometry
 import mesh
 import material
 
+from numba import jit
+from collections import defaultdict
+
+@jit(nopython=True, cache=True)
+def calculate_strains_fast(eps_x, cy_values, xsi):
+    return eps_x + cy_values * xsi
+
+@jit(nopython=True, cache=True)
+def calculate_section_forces_fast(area_values, stresses, cy_values):
+    N  = np.sum(area_values * stresses) / 1000
+    My = np.sum(area_values * stresses * cy_values) / 1e6
+    return N, My
+
 class stress_strain_analysis:
-    def __init__(self, mesh, Nx = 0, My = 0):
-
-        self.mesh   = mesh
-        self.Nx     = Nx
-        self.My     = My
-
-        self.strains  = []
-        self.stresses = []
+    def __init__(self, mesh, Nx=0, My=0):
+        self.mesh = mesh
+        self.Nx = Nx
+        self.My = My
 
         self.eps_x = 0
-        self.xsi   = 0
+        self.xsi = 0
+
+        self.area_values = np.array([elem.A for elem in self.mesh.elements])
+        self.cy_values = np.array([elem.Cy - self.mesh.Cy for elem in self.mesh.elements])
+
+        # Create groups for elements with the same material
+        self.material_groups = defaultdict(list)
+        self.materials = []
+        for i, elem in enumerate(self.mesh.elements):
+            if elem.material.name not in self.material_groups:
+                self.materials.append(elem.material)
+
+            self.material_groups[elem.material.name].append(i)
+
+        # Initialize stress array
+        self.strains  = np.zeros(len(self.mesh.elements))
+        self.stresses = np.zeros(len(self.mesh.elements))
 
     def set_strain_and_curvature(self, eps_x, xsi):
         self.eps_x = eps_x
-        self.xsi   = xsi 
+        self.xsi = xsi
 
     def calculate_strains(self):
-        
-        self.strains = np.array([])
+        self.strains = calculate_strains_fast(self.eps_x, self.cy_values, self.xsi)
 
-        for elem in self.mesh.elements:
-            eps_normal = self.eps_x
-            eps_cruv   = (elem.Cy - self.mesh.Cy) * self.xsi
-
-            self.strains = np.append(self.strains, eps_normal + eps_cruv)
-
-        return
-    
     def calculate_stresses(self):
-
-        self.stresses = np.array([])
-
-        for i, elem in enumerate(self.mesh.elements):
-            stress = elem.material.get_stress(self.strains[i])
-
-            self.stresses = np.append(self.stresses, stress)
-        
-        return
+    
+        # Compute stresses for each material group
+        for i, (material_name, indices) in enumerate(self.material_groups.items()):
+            indices = np.array(indices)  # Faster indexing
+            grouped_strains = self.strains[indices]
+            
+            # Compute stresses efficiently using the vectorized get_stress
+            self.stresses[indices] = self.materials[i].get_stress_vectorized(grouped_strains)
 
     def get_section_forces(self):
-        if len(self.stresses) == 0:
-            raise ValueError("Stresses have not been calculated. Run calculate_stresses() first.")
-        if len(self.strains) == 0:
-            raise ValueError("Strains have not been calculated. Run calculate_strains() first.")
-
-        N  = 0
-        My = 0
-
-        for i, elem in enumerate(self.mesh.elements):
-            N  += elem.A * self.stresses[i]
-            My += elem.A * self.stresses[i] * (elem.Cy - self.mesh.Cy)
-
-        N  = N  / 1000         # kN
-        My = My / 1000 / 1000 # kNm
-        
+        N, My = calculate_section_forces_fast(self.area_values, self.stresses, self.cy_values)
         return N, My
     
     def find_strain_and_curvature(self, V):

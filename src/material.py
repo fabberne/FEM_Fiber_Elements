@@ -1,4 +1,5 @@
 import numpy as np
+from numba import jit
 
 class Material:
 
@@ -14,26 +15,27 @@ class Material:
 class Concrete_C30_37(Material):
 
     def __init__(self):
-
         gamma   = 25 * 10**(-6)  # N/mm3
         E       = 32000          # N/mm2
         f_druck = 20             # N/mm2
         f_zug   = 1.28           # N/mm2
 
         super().__init__(gamma, E, f_druck, f_zug)
-
         self.color = (0, 0, 0, 0.5)
-    
-    def get_stress(self, strain):
+        self.name  = "Concrete_C30_37"
+        
+    @staticmethod
+    @jit(nopython=True, cache=True)
+    def get_stress_vectorized(strains):
+        E       = 32000          # N/mm2
+        f_druck = 20             # N/mm2
+        f_zug   = 1.28           # N/mm2
 
-        stress = self.E * strain
-
-        if stress > self.f_druck:
-            stress = self.f_druck
-        elif stress < -self.f_zug:
-            stress = 0
-
-        return stress
+        stresses = E * strains
+        stresses = np.clip(stresses, -f_zug, f_druck)  # Efficient thresholding
+        stresses = np.asarray(stresses, dtype=np.float64)
+        stresses[stresses <= -f_zug] = 0
+        return stresses
 
 
 class Steel_S235(Material):
@@ -48,12 +50,16 @@ class Steel_S235(Material):
         super().__init__(gamma, E, f_druck, f_zug)
 
         self.color = (0, 0, 1, 0.5)
+        self.name  = "Steel_S235" 
 
-    def get_stress(self, strain):
-
-        stress = np.sign(self.E * strain) * min(self.f_druck, abs(self.E * strain))
-
-        return stress
+    @staticmethod
+    @jit(nopython=True, cache=True)
+    def get_stress_vectorized(strains):
+        E       = 210000          # N/mm2
+        f_druck = 235             # N/mm2
+        
+        stresses = np.sign(E * strains) * np.minimum(f_druck, np.abs(E * strains))
+        return stresses
 
 
 
@@ -69,12 +75,15 @@ class Steel_S355(Material):
         super().__init__(gamma, E, f_druck, f_zug)
 
         self.color = (0, 0, 1, 0.5)
+        self.name  = "Steel_S355" 
     
-    def get_stress(self, strain):
-
-        stress = np.sign(self.E * strain) * min(self.f_druck, abs(self.E * strain))
-
-        return stress
+    @staticmethod
+    @jit(nopython=True, cache=True)
+    def get_stress_vectorized(strains):
+        E       = 210000          # N/mm2
+        f_druck = 355             # N/mm2
+        stresses = np.sign(E * strains) * np.minimum(f_druck, np.abs(E * strains))
+        return stresses
 
 
 class Rebar_B500B(Material):
@@ -89,19 +98,25 @@ class Rebar_B500B(Material):
         super().__init__(gamma, E, f_druck, f_zug)
 
         self.color = (0, 0.2, 1, 0.5)
-
-        self.f_k  = 1.08 * f_druck
-        self.e_s  = self.f_druck / self.E
-        self.E_h  = (self.f_k - self.f_druck) / (0.05 - self.e_s)
+        self.name  = "Rebar_B500B" 
     
-    def get_stress(self, strain):
+    @staticmethod
+    @jit(nopython=True, cache=True)
+    def get_stress_vectorized(strains):
+        # Vectorized conditional logic using np.where¨
+        E       = 205000          # N/mm2
+        f_druck = 435             # N/mm2
 
-        if abs(strain) <= self.e_s:
-            stress = strain * self.E
-        else:
-            stress = np.sign(strain) *  (self.f_druck + self.E_h * (abs(strain) - self.e_s))
+        f_k  = 1.08 * f_druck
+        e_s  = f_druck / E
+        E_h  = (f_k - f_druck) / (0.05 - e_s)
 
-        return stress
+        stresses = np.where(
+            np.abs(strains) <= e_s,
+            strains * E,
+            np.sign(strains) * (f_druck + E_h * (np.abs(strains) - e_s))
+        )
+        return stresses
 
 class Unknown(Material):
 
