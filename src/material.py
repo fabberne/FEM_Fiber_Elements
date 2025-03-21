@@ -57,7 +57,7 @@ class Steel_S235(Material):
     def get_stress_vectorized(strains):
         E       = 210000          # N/mm2
         f_druck = 235             # N/mm2
-        
+
         stresses = np.sign(E * strains) * np.minimum(f_druck, np.abs(E * strains))
         return stresses
 
@@ -110,6 +110,10 @@ class Rebar_B500B(Material):
         f_k  = 1.08 * f_druck
         e_s  = f_druck / E
         E_h  = (f_k - f_druck) / (0.05 - e_s)
+
+        
+        strains[strains < -0.05] = 0
+        strains[strains >  0.05] = 0
 
         stresses = np.where(
             np.abs(strains) <= e_s,
