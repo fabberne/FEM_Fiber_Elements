@@ -78,7 +78,9 @@ class stress_strain_analysis:
 
         Nx, My = self.get_section_forces()
 
-        Residual = (Nx - self.Nx)**2 + (My - self.My)**2
+        scale_N , scale_M  = max(abs(self.Nx), 1), max(abs(self.My), 1)
+
+        Residual = ((Nx - self.Nx) / scale_N) ** 2 + ((My - self.My) / scale_M) ** 2
 
         return Residual
 
