@@ -27,14 +27,32 @@ class Concrete_C30_37(Material):
     @staticmethod
     @jit(nopython=True, cache=True)
     def get_stress_vectorized(strains):
-        E       = 32000          # N/mm2
-        f_druck = 20             # N/mm2
-        f_zug   = 1.28           # N/mm2
+        f_druck = 30     
+        f_zug   = 1.28
+        e_max   = 0.0025
+        E = 32000
 
-        stresses = E * strains
-        stresses = np.clip(stresses, -f_zug, f_druck)  # Efficient thresholding
-        stresses = np.asarray(stresses, dtype=np.float64)
+        a = min(0.7 * f_druck ** (1/15), 1)
+        b = max(-0.02 * f_druck ** 0.8, -0.95)
+        c = 0.02 * f_druck ** (4/3)
+
+        # Vectorized calculation
+        stresses = np.where(
+            strains <= 0,                       # Negative strain (tensile behavior)
+            np.clip(E * strains, -f_zug, 0),  
+            
+            np.where(
+                strains <= e_max,      # Ascending branch
+                f_druck * (strains / e_max) ** ((a * (1 - strains / e_max)) /(1 + b * strains / e_max)),
+
+                # Descending branch
+                f_druck * (strains / e_max) ** (((c / strains) * (1 - (strains / e_max) ** c)) / (1 + (strains / e_max) ** c))
+            )
+        )
+        
+        # Ensure zero stress below tensile failure limit
         stresses[stresses <= -f_zug] = 0
+
         return stresses
 
 
@@ -103,23 +121,20 @@ class Rebar_B500B(Material):
     @staticmethod
     @jit(nopython=True, cache=True)
     def get_stress_vectorized(strains):
-        # Vectorized conditional logic using np.where¨
         E       = 205000          # N/mm2
-        f_druck = 435             # N/mm2
+        f_druck = 500             # N/mm2
 
         f_k  = 1.08 * f_druck
         e_s  = f_druck / E
         E_h  = (f_k - f_druck) / (0.05 - e_s)
 
-        
-        strains[strains < -0.05] = 0
-        strains[strains >  0.05] = 0
-
         stresses = np.where(
-            np.abs(strains) <= e_s,
+            (np.abs(strains) <= e_s),
             strains * E,
             np.sign(strains) * (f_druck + E_h * (np.abs(strains) - e_s))
         )
+        stresses[stresses <= -f_k] = 0
+        stresses[stresses >=  f_k] = 0
         return stresses
 
 class Unknown(Material):
