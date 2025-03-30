@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import rcParams
 from matplotlib.patches import Patch
 from tabulate import tabulate
 from mpl_toolkits.mplot3d import Axes3D
@@ -206,12 +207,12 @@ class LaminateLoadAnalysis:
     
 
     def apply_load(self, Nx, Ny, Nxy, Mx=0, My=0, Mxy=0):
-        N = np.array([Nx, Ny, Nxy])
-        M = np.array([Mx, My, Mxy])
+        self.N = np.array([Nx, Ny, Nxy])
+        self.M = np.array([Mx, My, Mxy])
         
         ABD = np.block([[self.laminate.A, self.laminate.B], [self.laminate.B, self.laminate.D]])
         
-        loads = np.concatenate((N, M))
+        loads = np.concatenate((self.N, self.M))
         
         midplane_strains_curvatures = np.linalg.solve(ABD, loads)
         midplane_strains = midplane_strains_curvatures[:3]
@@ -271,15 +272,19 @@ class LaminateLoadAnalysis:
         strain_table = [[i + 1] + list(map(lambda x: f"{x:.2e}", ply_strains[i])) for i in range(len(ply_strains))]
         stress_table = [[i + 1] + list(map(lambda x: f"{x:.2e}", ply_stresses[i])) for i in range(len(ply_stresses))]
         
-        print("\nDehnungen pro Schicht:")
-        print(tabulate(strain_table, headers=["Schicht", "Exx", "Eyy", "Gxy"], tablefmt="fancy_grid"))
+        print("\nstrains per layer:")
+        print(tabulate(strain_table, headers=["layer", "e_xx", "e_yy", "e_xy"], tablefmt="fancy_grid"))
         
-        print("\nSpannungen pro Schicht:")
-        print(tabulate(stress_table, headers=["Schicht", "Sxx", "Syy", "Txy"], tablefmt="fancy_grid"))
+        print("\nstresses per layer:")
+        print(tabulate(stress_table, headers=["layer", "s_xx", "s_yy", "t_xy"], tablefmt="fancy_grid"))
 
 
     def plot_stress_strain_variation(self):
-        fig, ax = plt.subplots(1, 3, gridspec_kw={'width_ratios': [1, 2, 2]}, figsize=(7, 4), sharey=True)
+        plt.rcParams['text.usetex'] = True
+        plt.rcParams['font.family'] = 'serif'
+        plt.rcParams['font.serif'] = ['Times New Roman']
+
+        fig, ax = plt.subplots(1, 3, gridspec_kw={'width_ratios': [2, 3, 3]}, figsize=(8, 4), sharey=True)
 
         colors = ["C0", "C1", "C2", "C3", "C4", "C5", "C6"]
         names  = []
@@ -307,38 +312,46 @@ class LaminateLoadAnalysis:
             current_height += layer['thickness']
 
         ax[0].set_xticks([])
-        ax[0].set_yticks([])
         ax[0].set_ylim(-total_thickness/2, total_thickness/2)
+        ax[0].set_yticks(z_positions)
+        ax[0].set_ylabel(r"Height [$mm$]")
 
         for i in enumerate(names):
             legend_elements = [Patch(facecolor=colors[i], edgecolor='k', label=names[i]) for i, name in enumerate(names)]
-        ax[0].legend(handles=legend_elements)
+        ax[0].legend(handles=legend_elements, loc='upper right')
 
 
         strains, stresses = self.compute_stress_strains_for_plot(self.midplane_strains, self.midplane_curvatures)
         # Strain variation plot
         strain_x = np.array([strain[0] for strain in strains])
-        ax[1].plot(strain_x, z_positions, color='C0', label="epsilon_xx")
+        ax[1].plot(strain_x, z_positions, color='C0', label=r"$\varepsilon_{xx}$")
         strain_y = np.array([strain[1] for strain in strains])
-        ax[1].plot(strain_y, z_positions, color='C1', label="epsilon_yy")
-        ax[1].set_title("Strain Variation")
-        ax[1].legend()
+        ax[1].plot(strain_y, z_positions, color='C1', label=r"$\varepsilon_{yy}$")
+        ax[1].legend(loc='upper right')
         ax[1].invert_yaxis()
+        ax[1].set_xlabel(r"Strain [$\frac{mm}{mm}$]")
 
         # Stress variation plot
         stress_x = np.array([stress[0] for stress in stresses])
-        ax[2].plot(stress_x, z_positions, color='C0', label="sigma_xx")
+        ax[2].plot(stress_x, z_positions, color='C0', label=r"$\sigma_{xx}$")
         stress_y = np.array([stress[1] for stress in stresses])
-        ax[2].plot(stress_y, z_positions, color='C1', label="sigma_yy")
-        ax[2].set_title("Stress Variation")
-        ax[2].legend()
+        ax[2].plot(stress_y, z_positions, color='C1', label=r"$\sigma_{yy}$")
+        ax[2].legend(loc='upper right')
         ax[2].invert_yaxis()
+        ax[2].set_xlabel(r"Stress [$N/mm^2$]")
 
         for a in ax:
-            a.axhline(0, color='black', linestyle='--')
-            a.axvline(0, color='black', linestyle='-')
+            a.axhline(0, color='black', linestyle='--', lw=0.5)
+            a.axvline(0, color='black', linestyle='-', lw=0.5)
             for i, h in enumerate(self.laminate.h):
                 a.axhline(h,color='k', linestyle='-', lw=0.5, alpha=0.5)
+
+        plt.suptitle(r"$N_x = {}$, $N_y = {}$, $N_{{xy}} = {}$".format(
+                     self.N[0], self.N[1], self.N[2])+
+                     "\n"+
+                     r"$M_x = {}$, $M_y = {}$, $M_{{xy}} = {}$".format(
+                     self.M[0], self.M[1], self.M[2]))
+        plt.subplots_adjust(wspace=0.3)
 
         plt.tight_layout()
         plt.show()
