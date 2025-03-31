@@ -1,8 +1,8 @@
-import numpy as np
-import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import matplotlib.tri as tri
+import matplotlib.pyplot as plt
 
+import numpy as np
 from tabulate import tabulate
 
 import element
@@ -59,7 +59,7 @@ class Mesh:
                        floatfmt =        ".2f"
              ))
 
-        CS_properties = [(" ", "X", "Y")]
+        CS_properties = [(" ", "y", "z")]
     
         CS_properties.append(("Centroid"         , self.Cx, self.Cy))
         CS_properties.append(("Moment of inertia", self.Ix, self.Iy))
@@ -70,12 +70,11 @@ class Mesh:
                        floatfmt =        ".2f"
              ))
 
-        return
-
 
     def plot(self):
-
-        # Plot elements
+        plt.rcParams['font.family'] = 'serif'
+        plt.rcParams['font.serif'] = ['Times New Roman']
+        
         fig, ax = plt.subplots(figsize=(6, 6))
 
         for i, element in enumerate(self.elements):
@@ -100,12 +99,9 @@ class Mesh:
                    s     =        20, 
                    label = "Centroid")
 
-        ax.set_xlabel("X")
-        ax.set_ylabel("Y")
+        ax.set_xlabel("y [$mm$]")
+        ax.set_ylabel("z [$mm$]")
         ax.set_frame_on(False)
-        ax.set_title("Mesh Visualization")
         ax.set_aspect('equal')
         ax.legend()
         plt.show()
-
-        return

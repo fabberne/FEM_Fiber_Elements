@@ -94,6 +94,9 @@ class stress_strain_analysis:
         if len(self.strains) == 0:
             raise ValueError("Strains have not been calculated. Run calculate_strains() first.")
 
+        plt.rcParams['font.family'] = 'serif'
+        plt.rcParams['font.serif'] = ['Times New Roman']
+
         # Normalize strains for color mapping
         max_strain = max(abs(min(self.strains)), abs(max(self.strains)))
         norm = colors.TwoSlopeNorm(vmin=-max_strain, vcenter=0, vmax=max_strain)
@@ -128,6 +131,9 @@ class stress_strain_analysis:
     def plot_stresses(self):
         if len(self.stresses) == 0:
             raise ValueError("Stresses have not been calculated. Run calculate_stresses() first.")
+
+        plt.rcParams['font.family'] = 'serif'
+        plt.rcParams['font.serif'] = ['Times New Roman']
 
         # Normalize strains for color mapping
         max_strain = max(abs(min(self.stresses)), abs(max(self.stresses)))

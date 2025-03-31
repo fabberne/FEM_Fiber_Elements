@@ -29,12 +29,12 @@ class Concrete_C30_37(Material):
     def get_stress_vectorized(strains):
         f_druck = 30     
         f_zug   = 1.28
-        e_max   = 0.0025
+        e_max   = 0.003
         E = 32000
 
         a = min(0.7 * f_druck ** (1/15), 1)
         b = max(-0.02 * f_druck ** 0.8, -0.95)
-        c = 0.02 * f_druck ** (4/3)
+        c = 0.02 * f_druck
 
         # Vectorized calculation
         stresses = np.where(
@@ -46,7 +46,7 @@ class Concrete_C30_37(Material):
                 f_druck * (strains / e_max) ** ((a * (1 - strains / e_max)) /(1 + b * strains / e_max)),
 
                 # Descending branch
-                f_druck * (strains / e_max) ** (((c / strains) * (1 - (strains / e_max) ** c)) / (1 + (strains / e_max) ** c))
+                f_druck * (strains / e_max) ** (((c **(e_max / strains)) * (1 - (strains / e_max) ** c)) / (1 + (strains / e_max) ** c))
             )
         )
         

@@ -96,6 +96,11 @@ class Laminate:
 
 
     def plot(self):
+        
+        plt.rcParams['text.usetex'] = True
+        plt.rcParams['font.family'] = 'serif'
+        plt.rcParams['font.serif'] = ['Times New Roman']
+        
         fig = plt.figure(figsize=(12, 7))
         ax = fig.add_subplot(111, projection='3d', computed_zorder=False)
         colors = ["C0", "C1", "C2", "C3", "C4", "C5", "C6"]
